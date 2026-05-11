@@ -18,7 +18,10 @@ def print_state(game: BlackjackGame) -> None:
 
 def ask_bet(game: BlackjackGame) -> float | None:
     while True:
-        raw = input(f"Bet amount, or quit (chips {game.chips:g}): ").strip().lower()
+        try:
+            raw = input(f"Bet amount, or quit (chips {game.chips:g}): ").strip().lower()
+        except EOFError:
+            return None
         if raw in {"q", "quit", "exit"}:
             return None
         try:

@@ -121,7 +121,7 @@ class BlackjackGame:
                 actions.add(Action.SPLIT)
         return actions
 
-    def hit(self) -> RoundResult | None:
+    def hit(self, auto_dealer: bool = True) -> RoundResult | None:
         self._require_action(Action.HIT)
         self.player_has_acted = True
         self.player_hand.add(self.deck.deal())
@@ -132,18 +132,22 @@ class BlackjackGame:
                 return self.settle_round()
             if self._advance_split_hand():
                 return None
-            return self.finish_player_turn()
+            if auto_dealer:
+                return self.finish_player_turn()
+            return self.begin_dealer_turn()
         return None
 
-    def stand(self) -> RoundResult:
+    def stand(self, auto_dealer: bool = True) -> RoundResult:
         self._require_action(Action.STAND)
         self.player_has_acted = True
         self.log.append(f"Hand {self.current_hand_index + 1} stands.")
         if self._advance_split_hand():
             return RoundResult("next_hand", 0, "Next split hand.", self.current_hand_index)
-        return self.finish_player_turn()
+        if auto_dealer:
+            return self.finish_player_turn()
+        return self.begin_dealer_turn()
 
-    def double_down(self) -> RoundResult:
+    def double_down(self, auto_dealer: bool = True) -> RoundResult:
         self._require_action(Action.DOUBLE)
         self.bet *= 2
         self.hand_bets[self.current_hand_index] = self.bet
@@ -152,6 +156,8 @@ class BlackjackGame:
         self.log.append("Player doubles down.")
         if self.player_hand.is_bust:
             return self.settle_round()
+        if not auto_dealer:
+            return self.begin_dealer_turn()
         return self.finish_player_turn()
 
     def split(self) -> None:
@@ -169,15 +175,34 @@ class BlackjackGame:
         self.log.append("Player splits.")
 
     def finish_player_turn(self) -> RoundResult:
-        self.phase = Phase.DEALER_TURN
+        self.begin_dealer_turn()
         self.dealer_play()
+        return self.settle_round()
+
+    def begin_dealer_turn(self) -> RoundResult:
+        self.phase = Phase.DEALER_TURN
+        return RoundResult("dealer_turn", 0, "Dealer turn.")
+
+    def dealer_should_draw(self) -> bool:
+        return self.phase == Phase.DEALER_TURN and self.dealer_hand.value < 17
+
+    def dealer_draw(self) -> Card:
+        if not self.dealer_should_draw():
+            raise ValueError("dealer cannot draw now")
+        card = self.deck.deal()
+        self.dealer_hand.add(card)
+        self.log.append("Dealer draws.")
+        return card
+
+    def finish_dealer_turn(self) -> RoundResult:
+        if self.phase != Phase.DEALER_TURN:
+            raise ValueError("dealer turn has not started")
         return self.settle_round()
 
     def dealer_play(self) -> None:
         self.phase = Phase.DEALER_TURN
         while self.dealer_hand.value < 17:
-            self.dealer_hand.add(self.deck.deal())
-            self.log.append("Dealer draws.")
+            self.dealer_draw()
 
     def settle_round(self) -> RoundResult:
         self.hand_results = [

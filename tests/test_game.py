@@ -54,6 +54,29 @@ def test_stand_runs_dealer_to_seventeen_and_player_wins_when_dealer_busts():
     assert game.chips == 110
 
 
+def test_stand_can_begin_dealer_turn_without_drawing_all_cards():
+    game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
+        Card("K", "clubs"),
+        Card("8", "diamonds"),
+        Card("8", "clubs"),
+        Card("6", "hearts"),
+        Card("10", "spades"),
+    ])
+
+    game.start_round(10)
+    game.stand(auto_dealer=False)
+
+    assert game.phase == Phase.DEALER_TURN
+    assert game.dealer_hand.value == 14
+    assert game.result is None
+
+    game.dealer_draw()
+
+    assert game.dealer_hand.value == 24
+    assert game.finish_dealer_turn().outcome == "dealer_bust"
+    assert game.chips == 110
+
+
 def test_double_down_doubles_bet_deals_one_card_and_settles():
     game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
         Card("5", "clubs"),

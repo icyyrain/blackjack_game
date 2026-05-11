@@ -90,13 +90,13 @@ class BlackjackApp(tk.Tk):
         self._animate_initial_deal()
 
     def hit(self) -> None:
-        self._delay_action("Dealing player card...", self.game.hit)
+        self._delay_action("Dealing player card...", lambda: self.game.hit(auto_dealer=False))
 
     def stand(self) -> None:
-        self._delay_action("Dealer playing...", self.game.stand)
+        self._delay_action("Dealer playing...", lambda: self.game.stand(auto_dealer=False))
 
     def double_down(self) -> None:
-        self._delay_action("Doubling down...", self.game.double_down)
+        self._delay_action("Doubling down...", lambda: self.game.double_down(auto_dealer=False))
 
     def split(self) -> None:
         self._delay_action("Splitting hand...", self.game.split)
@@ -152,6 +152,8 @@ class BlackjackApp(tk.Tk):
     def _complete_delayed_action(self, action) -> None:
         action()
         self._refresh()
+        if self.game.phase == Phase.DEALER_TURN and not self.game.result:
+            self._animate_dealer_turn()
 
     def _animate_initial_deal(self) -> None:
         self.dealing = True
@@ -184,6 +186,20 @@ class BlackjackApp(tk.Tk):
     def _finish_initial_deal(self) -> None:
         self.dealing = False
         self._refresh()
+
+    def _animate_dealer_turn(self) -> None:
+        self._set_button_states(disabled=True)
+        if self.game.dealer_should_draw():
+            self.status_var.set("Dealer draws...")
+            self.after(self.action_delay_ms, self._dealer_draw_step)
+            return
+        self.game.finish_dealer_turn()
+        self._refresh()
+
+    def _dealer_draw_step(self) -> None:
+        self.game.dealer_draw()
+        self._refresh()
+        self.after(self.action_delay_ms, self._animate_dealer_turn)
 
 
 def main() -> None:

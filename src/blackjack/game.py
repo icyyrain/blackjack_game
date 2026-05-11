@@ -117,7 +117,7 @@ class BlackjackGame:
         ):
             actions.add(Action.DOUBLE)
             first, second = self.player_hand.cards
-            if first.rank == second.rank:
+            if first.value == second.value:
                 actions.add(Action.SPLIT)
         return actions
 

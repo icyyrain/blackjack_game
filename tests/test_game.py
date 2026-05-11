@@ -166,6 +166,22 @@ def test_split_is_legal_for_initial_pair_and_creates_two_hands():
     assert Action.DOUBLE not in game.legal_actions()
 
 
+def test_split_is_legal_for_equal_value_face_cards():
+    game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
+        Card("9", "clubs"),
+        Card("5", "diamonds"),
+        Card("6", "clubs"),
+        Card("Q", "hearts"),
+        Card("4", "spades"),
+        Card("J", "clubs"),
+    ])
+
+    game.start_round(10)
+
+    assert game.player_hand.value == 20
+    assert Action.SPLIT in game.legal_actions()
+
+
 def test_split_hands_settle_independently_against_dealer():
     game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
         Card("10", "clubs"),

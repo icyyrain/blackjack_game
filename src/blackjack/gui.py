@@ -100,7 +100,9 @@ class BlackjackApp(tk.Tk):
         self._delay_action("Doubling down...", lambda: self.game.double_down(auto_dealer=False))
 
     def split(self) -> None:
-        self._delay_action("Splitting hand...", self.game.split)
+        self.status_var.set("Splitting hand...")
+        self._set_button_states(disabled=True)
+        self.after(self.action_delay_ms, self._begin_split_animation)
 
     def show_rules(self) -> None:
         messagebox.showinfo(
@@ -231,6 +233,22 @@ class BlackjackApp(tk.Tk):
         self.game.dealer_draw()
         self._refresh()
         self.after(self.action_delay_ms, self._animate_dealer_turn)
+
+    def _begin_split_animation(self) -> None:
+        self.game.split(deal_replacements=False)
+        self._refresh()
+        self.status_var.set("Dealing split hands...")
+        self.after(self.action_delay_ms, self._deal_split_replacement_step)
+
+    def _deal_split_replacement_step(self) -> None:
+        self.game.deal_split_replacement()
+        self._refresh()
+        if self.game.split_replacement_index < len(self.game.player_hands):
+            self.status_var.set("Dealing split hands...")
+            self.after(self.action_delay_ms, self._deal_split_replacement_step)
+            return
+        self.status_var.set("Choose your action.")
+        self._set_button_states()
 
 
 def main() -> None:

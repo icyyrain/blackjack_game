@@ -182,6 +182,34 @@ def test_split_is_legal_for_equal_value_face_cards():
     assert Action.SPLIT in game.legal_actions()
 
 
+def test_split_can_delay_replacement_cards_for_animation():
+    game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
+        Card("9", "clubs"),
+        Card("7", "diamonds"),
+        Card("6", "clubs"),
+        Card("8", "hearts"),
+        Card("5", "spades"),
+        Card("8", "clubs"),
+    ])
+
+    game.start_round(10)
+    game.split(deal_replacements=False)
+
+    assert [card.rank for card in game.player_hands[0].cards] == ["8"]
+    assert [card.rank for card in game.player_hands[1].cards] == ["8"]
+    assert game.split_replacement_index == 0
+
+    game.deal_split_replacement()
+    assert [card.rank for card in game.player_hands[0].cards] == ["8", "7"]
+    assert [card.rank for card in game.player_hands[1].cards] == ["8"]
+    assert game.split_replacement_index == 1
+
+    game.deal_split_replacement()
+    assert [card.rank for card in game.player_hands[0].cards] == ["8", "7"]
+    assert [card.rank for card in game.player_hands[1].cards] == ["8", "9"]
+    assert game.split_replacement_index == 2
+
+
 def test_split_hands_settle_independently_against_dealer():
     game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
         Card("10", "clubs"),

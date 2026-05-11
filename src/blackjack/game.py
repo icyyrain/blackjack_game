@@ -46,6 +46,7 @@ class BlackjackGame:
     hand_results: list[RoundResult] = field(default_factory=list, init=False)
     current_hand_index: int = field(default=0, init=False)
     split_active: bool = field(default=False, init=False)
+    split_replacement_index: int = field(default=0, init=False)
     dealer_hand: Hand = field(default_factory=Hand, init=False)
     phase: Phase = field(default=Phase.BETTING, init=False)
     result: RoundResult | None = field(default=None, init=False)
@@ -79,6 +80,7 @@ class BlackjackGame:
         self.hand_results = []
         self.current_hand_index = 0
         self.split_active = False
+        self.split_replacement_index = 0
         self.dealer_hand = Hand()
         self.result = None
         self.log = ["New round started."]
@@ -160,7 +162,7 @@ class BlackjackGame:
             return self.begin_dealer_turn()
         return self.finish_player_turn()
 
-    def split(self) -> None:
+    def split(self, deal_replacements: bool = True) -> None:
         self._require_action(Action.SPLIT)
         first, second = self.player_hand.cards
         self.split_active = True
@@ -170,9 +172,21 @@ class BlackjackGame:
         self.current_hand_index = 0
         self.player_hand = self.player_hands[0]
         self.player_has_acted = False
-        self.player_hands[0].add(self.deck.deal())
-        self.player_hands[1].add(self.deck.deal())
+        self.split_replacement_index = 0
+        if deal_replacements:
+            self.deal_split_replacement()
+            self.deal_split_replacement()
         self.log.append("Player splits.")
+
+    def deal_split_replacement(self) -> Card:
+        if not self.split_active or self.split_replacement_index >= len(self.player_hands):
+            raise ValueError("no split hand needs a replacement card")
+        hand = self.player_hands[self.split_replacement_index]
+        card = self.deck.deal()
+        hand.add(card)
+        self.split_replacement_index += 1
+        self.log.append(f"Hand {self.split_replacement_index} receives a card.")
+        return card
 
     def finish_player_turn(self) -> RoundResult:
         self.begin_dealer_turn()

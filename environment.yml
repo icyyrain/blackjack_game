@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - cairosvg
+  - pillow
   - python>=3.11
   - pyinstaller
   - pytest>=8

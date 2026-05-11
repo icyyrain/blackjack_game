@@ -193,10 +193,10 @@ class BlackjackApp(tk.Tk):
             return
         self.destroy()
 
-    def _dealer_text(self) -> str:
+    def _dealer_text(self, hide_hole_card: bool = False) -> str:
         if not self.game.dealer_hand.cards:
             return "Dealer:"
-        if self.game.phase == Phase.PLAYER_TURN:
+        if self.game.phase == Phase.PLAYER_TURN or hide_hole_card:
             visible_value = self.game.dealer_hand.cards[0].value
             return f"Dealer: ({visible_value}+?)"
         return f"Dealer: ({self.game.dealer_hand.value})"
@@ -206,10 +206,14 @@ class BlackjackApp(tk.Tk):
             return f"Player: ({self.game.player_hand.value})"
         return "Player hands"
 
-    def _refresh_dealer_area(self) -> None:
-        self.dealer_var.set(self._dealer_text())
+    def _refresh_dealer_area(self, hide_hole_card: bool = False) -> None:
+        self.dealer_var.set(self._dealer_text(hide_hole_card=hide_hole_card))
         self._set_card_title_fonts()
-        hidden_indexes = {1} if self.game.phase == Phase.PLAYER_TURN and len(self.game.dealer_hand.cards) > 1 else set()
+        hidden_indexes = (
+            {1}
+            if (self.game.phase == Phase.PLAYER_TURN or hide_hole_card) and len(self.game.dealer_hand.cards) > 1
+            else set()
+        )
         self._render_card_row(self.dealer_cards_frame, self.game.dealer_hand.cards, hidden_indexes=hidden_indexes)
 
     def _refresh_player_area(self) -> None:
@@ -295,10 +299,26 @@ class BlackjackApp(tk.Tk):
         self.after(self.action_delay_ms, lambda: self._complete_delayed_action(action))
 
     def _complete_delayed_action(self, action) -> None:
-        action()
+        result = action()
+        if self._should_delay_dealer_reveal(result):
+            self._show_player_bust_before_dealer_reveal()
+            self.after(self.action_delay_ms, self._refresh)
+            return
         self._refresh()
         if self.game.phase == Phase.DEALER_TURN and not self.game.result:
             self._animate_dealer_turn()
+
+    def _should_delay_dealer_reveal(self, result) -> bool:
+        return bool(result and self.game.result and self.game.result.outcome == "player_bust")
+
+    def _show_player_bust_before_dealer_reveal(self) -> None:
+        self.chips_var.set(f"Chips: {self.game.chips:g}")
+        self.deck_var.set(f"Deck: {len(self.game.deck)} cards")
+        self._refresh_dealer_area(hide_hole_card=True)
+        self._refresh_player_area()
+        self.log_var.set("\n".join(self.game.log[-4:]))
+        self.status_var.set("Player busts. Dealer reveals...")
+        self._set_button_states(disabled=True)
 
     def _animate_initial_deal(self) -> None:
         self.dealing = True

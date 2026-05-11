@@ -4,10 +4,11 @@ import argparse
 from pathlib import Path
 
 import cairosvg
+from PIL import Image
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE_DIR = PROJECT_ROOT / "assets" / "poker-super2-box-qr"
+DEFAULT_SOURCE_DIR = PROJECT_ROOT / "assets" / "poker-super2-box-top-qr"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "assets" / "cards"
 
 CARD_NAMES = [
@@ -25,6 +26,8 @@ def convert_svg_to_png(source: Path, output: Path, width: int, height: int) -> N
         output_width=width,
         output_height=height,
     )
+    with Image.open(output) as image:
+        image.convert("RGBA").save(output, format="PNG")
 
 
 def convert_card_images(source_dir: Path, output_dir: Path, width: int, height: int) -> int:

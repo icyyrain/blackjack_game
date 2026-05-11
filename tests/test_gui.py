@@ -8,6 +8,7 @@ from blackjack.gui import BlackjackApp, initial_deal_deck_count
 @pytest.fixture(scope="module")
 def app():
     app = BlackjackApp()
+    app.update_idletasks()
     yield app
     app.destroy()
 
@@ -145,3 +146,29 @@ def test_split_hands_stay_horizontal_with_matching_font(app):
     assert all(label.cget("font") == "Consolas 16" for label in hand_labels)
     assert app.player_panel.cget("height") == app.card_panel_height
     assert app.player_panel.pack_propagate() is None
+
+
+def test_player_bust_delays_dealer_reveal(app, monkeypatch):
+    app.game.deck_factory = lambda: [
+        Card("9", "clubs"),
+        Card("9", "spades"),
+        Card("6", "diamonds"),
+        Card("10", "hearts"),
+        Card("8", "clubs"),
+    ]
+    app.toggle_card_view()
+    app.game.start_round(10)
+    app._refresh()
+    scheduled = []
+    monkeypatch.setattr(app, "after", lambda delay, callback: scheduled.append((delay, callback)))
+    app._complete_delayed_action(lambda: app.game.hit(auto_dealer=False))
+
+    assert app.game.result is not None
+    assert app.dealer_var.get() == "Dealer: (10+?)"
+    dealer_labels = [
+        child.cget("text")
+        for child in app.dealer_cards_frame.winfo_children()
+        if child.winfo_class() == "Label"
+    ]
+    assert dealer_labels == ["[10♥] [?]"]
+    assert scheduled == [(app.action_delay_ms, app._refresh)]

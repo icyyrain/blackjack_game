@@ -20,6 +20,7 @@ class BlackjackApp(tk.Tk):
         self.geometry("760x520")
         self.configure(bg="#14532d")
         self.game = BlackjackGame(starting_chips=100)
+        self.starting_chips = 100
         self.action_delay_ms = 500
         self.dealing = False
 
@@ -156,6 +157,17 @@ class BlackjackApp(tk.Tk):
             self.status_var.set("Place a bet to start.")
 
         self._set_button_states()
+        if self.game.result and self.game.chips <= 0:
+            self.after_idle(self._handle_game_over)
+
+    def _handle_game_over(self) -> None:
+        restart = messagebox.askyesno("Game over", "You are out of chips. Start a new game?")
+        if restart:
+            self.game = BlackjackGame(starting_chips=self.starting_chips)
+            self.status_var.set("Place a bet to start.")
+            self._refresh()
+            return
+        self.destroy()
 
     def _dealer_text(self) -> str:
         if not self.game.dealer_hand.cards:

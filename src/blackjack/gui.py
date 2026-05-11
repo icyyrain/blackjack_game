@@ -6,6 +6,13 @@ from tkinter import messagebox
 from blackjack.game import Action, BlackjackGame, Phase
 
 
+INITIAL_DEAL_CARDS = 4
+
+
+def initial_deal_deck_count(final_deck_count: int, shown_cards: int) -> int:
+    return final_deck_count + max(INITIAL_DEAL_CARDS - shown_cards, 0)
+
+
 class BlackjackApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -208,13 +215,17 @@ class BlackjackApp(tk.Tk):
             ),
         ]
         for index, (player_text, dealer_text) in enumerate(sequence, start=1):
-            self.after(self.action_delay_ms * index, lambda p=player_text, d=dealer_text: self._show_deal_step(p, d))
+            deck_count = initial_deal_deck_count(len(self.game.deck), index)
+            self.after(
+                self.action_delay_ms * index,
+                lambda p=player_text, d=dealer_text, count=deck_count: self._show_deal_step(p, d, count),
+            )
         self.after(self.action_delay_ms * (len(sequence) + 1), self._finish_initial_deal)
 
-    def _show_deal_step(self, player_text: str, dealer_text: str) -> None:
+    def _show_deal_step(self, player_text: str, dealer_text: str, deck_count: int) -> None:
         self.player_var.set(player_text)
         self.dealer_var.set(dealer_text)
-        self.deck_var.set(f"Deck: {len(self.game.deck)} cards")
+        self.deck_var.set(f"Deck: {deck_count} cards")
 
     def _finish_initial_deal(self) -> None:
         self.dealing = False

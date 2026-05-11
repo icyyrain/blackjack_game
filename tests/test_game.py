@@ -193,21 +193,26 @@ def test_split_can_delay_replacement_cards_for_animation():
     ])
 
     game.start_round(10)
+    assert len(game.deck) == 2
+
     game.split(deal_replacements=False)
 
     assert [card.rank for card in game.player_hands[0].cards] == ["8"]
     assert [card.rank for card in game.player_hands[1].cards] == ["8"]
     assert game.split_replacement_index == 0
+    assert len(game.deck) == 2
 
     game.deal_split_replacement()
     assert [card.rank for card in game.player_hands[0].cards] == ["8", "7"]
     assert [card.rank for card in game.player_hands[1].cards] == ["8"]
     assert game.split_replacement_index == 1
+    assert len(game.deck) == 1
 
     game.deal_split_replacement()
     assert [card.rank for card in game.player_hands[0].cards] == ["8", "7"]
     assert [card.rank for card in game.player_hands[1].cards] == ["8", "9"]
     assert game.split_replacement_index == 2
+    assert len(game.deck) == 0
 
 
 def test_split_hands_settle_independently_against_dealer():

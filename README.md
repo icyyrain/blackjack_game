@@ -25,3 +25,11 @@ conda run -n blackjack-game python -m blackjack.cli
 ```powershell
 conda run -n blackjack-game python -m blackjack.gui
 ```
+
+## Build Windows EXE
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1
+```
+
+The executable is written to `dist\Blackjack.exe`.

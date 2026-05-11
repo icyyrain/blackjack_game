@@ -10,3 +10,4 @@ venv/
 .deps/
 dist/
 build/
+Blackjack.spec

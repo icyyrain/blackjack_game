@@ -3,6 +3,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox
 
+from blackjack.card_images import card_back_path, card_image_path
+from blackjack.cards import Card
 from blackjack.game import Action, BlackjackGame, Phase
 
 
@@ -17,12 +19,13 @@ class BlackjackApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Blackjack")
-        self.geometry("760x520")
+        self.geometry("1210x720")
         self.configure(bg="#14532d")
         self.game = BlackjackGame(starting_chips=100)
         self.starting_chips = 100
         self.action_delay_ms = 500
         self.dealing = False
+        self.card_panel_height = 176
 
         self.status_var = tk.StringVar(value="Place a bet to start.")
         self.chips_var = tk.StringVar()
@@ -31,6 +34,8 @@ class BlackjackApp(tk.Tk):
         self.dealer_var = tk.StringVar()
         self.player_var = tk.StringVar()
         self.log_var = tk.StringVar()
+        self.card_images: dict[str, tk.PhotoImage] = {}
+        self.card_view_mode = "images"
 
         self._build()
         self._refresh()
@@ -52,28 +57,42 @@ class BlackjackApp(tk.Tk):
         tk.Label(info, text="Bet:", font=("Segoe UI", 12), fg="white", bg="#14532d").pack(side="right")
         tk.Entry(info, textvariable=self.bet_var, width=8).pack(side="right", padx=8)
         tk.Button(info, text="Rules", width=8, command=self.show_rules).pack(side="right", padx=8)
+        self.view_button = tk.Button(info, text="Text Cards", width=10, command=self.toggle_card_view)
+        self.view_button.pack(side="right", padx=8)
 
-        self.dealer_label = tk.Label(
-            self,
+        self.dealer_panel = tk.Frame(self, bg="#166534", height=self.card_panel_height)
+        self.dealer_panel.pack(fill="x", padx=24, pady=16)
+        self.dealer_panel.pack_propagate(False)
+        self.dealer_content = tk.Frame(self.dealer_panel, bg="#166534")
+        self.dealer_content.pack(expand=True)
+        self.dealer_title_label = tk.Label(
+            self.dealer_content,
             textvariable=self.dealer_var,
-            font=("Consolas", 16),
-            fg="white",
+            font=("Segoe UI", 14, "bold"),
+            fg="#f8fafc",
             bg="#166534",
-            justify="center",
         )
-        self.dealer_label.pack(fill="x", padx=24, pady=16, ipady=18)
+        self.dealer_title_label.pack(pady=(0, 4))
+        self.dealer_cards_frame = tk.Frame(self.dealer_content, bg="#166534")
+        self.dealer_cards_frame.pack()
 
         tk.Label(self, textvariable=self.status_var, font=("Segoe UI", 13), fg="white", bg="#14532d").pack(pady=6)
 
-        self.player_label = tk.Label(
-            self,
+        self.player_panel = tk.Frame(self, bg="#166534", height=self.card_panel_height)
+        self.player_panel.pack(fill="x", padx=24, pady=16)
+        self.player_panel.pack_propagate(False)
+        self.player_content = tk.Frame(self.player_panel, bg="#166534")
+        self.player_content.pack(expand=True)
+        self.player_title_label = tk.Label(
+            self.player_content,
             textvariable=self.player_var,
-            font=("Consolas", 16),
-            fg="white",
+            font=("Segoe UI", 14, "bold"),
+            fg="#f8fafc",
             bg="#166534",
-            justify="center",
         )
-        self.player_label.pack(fill="x", padx=24, pady=16, ipady=18)
+        self.player_title_label.pack(pady=(0, 4))
+        self.player_cards_frame = tk.Frame(self.player_content, bg="#166534")
+        self.player_cards_frame.pack()
 
         buttons = tk.Frame(self, bg="#14532d")
         buttons.pack(pady=10)
@@ -142,11 +161,16 @@ class BlackjackApp(tk.Tk):
             ),
         )
 
+    def toggle_card_view(self) -> None:
+        self.card_view_mode = "text" if self.card_view_mode == "images" else "images"
+        self.view_button.config(text="Image Cards" if self.card_view_mode == "text" else "Text Cards")
+        self._refresh()
+
     def _refresh(self) -> None:
         self.chips_var.set(f"Chips: {self.game.chips:g}")
         self.deck_var.set(f"Deck: {len(self.game.deck)} cards")
-        self.dealer_var.set(self._dealer_text())
-        self.player_var.set(self._player_text())
+        self._refresh_dealer_area()
+        self._refresh_player_area()
         self.log_var.set("\n".join(self.game.log[-4:]))
 
         if self.game.result:
@@ -171,21 +195,90 @@ class BlackjackApp(tk.Tk):
 
     def _dealer_text(self) -> str:
         if not self.game.dealer_hand.cards:
-            return "Dealer:\n(none)"
+            return "Dealer:"
         if self.game.phase == Phase.PLAYER_TURN:
             visible_value = self.game.dealer_hand.cards[0].value
-            return f"Dealer: ({visible_value}+?)\n{self.game.dealer_display()}"
-        return f"Dealer: ({self.game.dealer_hand.value})\n{self.game.dealer_display()}"
+            return f"Dealer: ({visible_value}+?)"
+        return f"Dealer: ({self.game.dealer_hand.value})"
 
     def _player_text(self) -> str:
         if not self.game.split_active:
-            cards = self.game.player_hand.display() or "(none)"
-            return f"Player: ({self.game.player_hand.value})\n{cards}"
-        lines = []
+            return f"Player: ({self.game.player_hand.value})"
+        return "Player hands"
+
+    def _refresh_dealer_area(self) -> None:
+        self.dealer_var.set(self._dealer_text())
+        self._set_card_title_fonts()
+        hidden_indexes = {1} if self.game.phase == Phase.PLAYER_TURN and len(self.game.dealer_hand.cards) > 1 else set()
+        self._render_card_row(self.dealer_cards_frame, self.game.dealer_hand.cards, hidden_indexes=hidden_indexes)
+
+    def _refresh_player_area(self) -> None:
+        self.player_var.set(self._player_text())
+        self._set_card_title_fonts()
+        self._clear_frame(self.player_cards_frame)
+        if not self.game.split_active:
+            self.player_panel.config(height=self.card_panel_height)
+            self.player_panel.pack_propagate(False)
+            self._render_card_row(self.player_cards_frame, self.game.player_hand.cards)
+            return
+        self.player_panel.config(height=self.card_panel_height)
+        self.player_panel.pack_propagate(False)
         for index, hand in enumerate(self.game.player_hands):
-            marker = ">" if index == self.game.current_hand_index and self.game.phase == Phase.PLAYER_TURN else " "
-            lines.append(f"{marker} Hand {index + 1}: ({hand.value})\n  {hand.display()}")
-        return "\n".join(lines)
+            hand_frame = tk.Frame(self.player_cards_frame, bg="#166534")
+            hand_frame.pack(side="left", padx=10)
+            marker = "> " if index == self.game.current_hand_index and self.game.phase == Phase.PLAYER_TURN else ""
+            tk.Label(
+                hand_frame,
+                text=f"{marker}Hand {index + 1}: ({hand.value})",
+                font=("Consolas", 16),
+                fg="#f8fafc",
+                bg="#166534",
+            ).pack(side="left", padx=(0, 8))
+            row = tk.Frame(hand_frame, bg="#166534")
+            row.pack(side="left")
+            self._render_card_row(row, hand.cards)
+
+    def _clear_frame(self, frame: tk.Frame) -> None:
+        for child in frame.winfo_children():
+            child.destroy()
+
+    def _set_card_title_fonts(self) -> None:
+        self.dealer_title_label.config(font=("Consolas", 16))
+        self.player_title_label.config(font=("Consolas", 16))
+
+    def _card_photo(self, card: Card | None) -> tk.PhotoImage:
+        path = card_back_path() if card is None else card_image_path(card)
+        key = str(path)
+        if key not in self.card_images:
+            self.card_images[key] = tk.PhotoImage(master=self, file=key)
+        return self.card_images[key]
+
+    def _render_card_row(
+        self,
+        frame: tk.Frame,
+        cards: list[Card],
+        hidden_indexes: set[int] | None = None,
+    ) -> None:
+        self._clear_frame(frame)
+        if not cards:
+            tk.Label(frame, text="(none)", font=("Segoe UI", 12), fg="#d1d5db", bg="#166534").pack()
+            return
+        hidden = hidden_indexes or set()
+        if self.card_view_mode == "text":
+            text = " ".join("[?]" if index in hidden else card.display() for index, card in enumerate(cards))
+            tk.Label(
+                frame,
+                text=text,
+                font=("Consolas", 16),
+                fg="#f8fafc",
+                bg="#166534",
+            ).pack()
+            return
+        for index, card in enumerate(cards):
+            photo = self._card_photo(None if index in hidden else card)
+            label = tk.Label(frame, image=photo, bg="#166534", borderwidth=0)
+            label.image = photo
+            label.pack(side="left", padx=5)
 
     def _set_button_states(self, disabled: bool = False) -> None:
         legal = set() if disabled else self.game.legal_actions()
@@ -210,33 +303,50 @@ class BlackjackApp(tk.Tk):
     def _animate_initial_deal(self) -> None:
         self.dealing = True
         self._set_button_states(disabled=True)
-        self.dealer_var.set("Dealer:\n(none)")
-        self.player_var.set("Player:\n(none)")
+        self.dealer_var.set("Dealer:")
+        self.player_var.set("Player:")
+        self._render_card_row(self.dealer_cards_frame, [])
+        self._render_card_row(self.player_cards_frame, [])
         self.status_var.set("Dealing...")
         first = self.game.player_hands[0]
         sequence = [
-            (f"Player:\n{first.cards[0].display()}", "Dealer:\n(none)"),
-            (f"Player:\n{first.cards[0].display()}", f"Dealer:\n{self.game.dealer_hand.cards[0].display()}"),
+            ("Player:", [first.cards[0]], "Dealer:", [], set()),
+            ("Player:", [first.cards[0]], "Dealer:", [self.game.dealer_hand.cards[0]], set()),
+            ("Player:", [first.cards[0], first.cards[1]], "Dealer:", [self.game.dealer_hand.cards[0]], set()),
             (
-                f"Player:\n{first.cards[0].display()} {first.cards[1].display()}",
-                f"Dealer:\n{self.game.dealer_hand.cards[0].display()}",
-            ),
-            (
-                f"Player: ({first.value})\n{first.display()}",
-                f"Dealer: ({self.game.dealer_hand.cards[0].value}+?)\n{self.game.dealer_hand.cards[0].display()} [?]",
+                f"Player: ({first.value})",
+                first.cards,
+                f"Dealer: ({self.game.dealer_hand.cards[0].value}+?)",
+                self.game.dealer_hand.cards,
+                {1},
             ),
         ]
-        for index, (player_text, dealer_text) in enumerate(sequence, start=1):
+        for index, (player_text, player_cards, dealer_text, dealer_cards, hidden_indexes) in enumerate(sequence, start=1):
             deck_count = initial_deal_deck_count(len(self.game.deck), index)
             self.after(
                 self.action_delay_ms * index,
-                lambda p=player_text, d=dealer_text, count=deck_count: self._show_deal_step(p, d, count),
+                lambda p=player_text,
+                pc=player_cards,
+                d=dealer_text,
+                dc=dealer_cards,
+                h=hidden_indexes,
+                count=deck_count: self._show_deal_step(p, pc, d, dc, h, count),
             )
         self.after(self.action_delay_ms * (len(sequence) + 1), self._finish_initial_deal)
 
-    def _show_deal_step(self, player_text: str, dealer_text: str, deck_count: int) -> None:
+    def _show_deal_step(
+        self,
+        player_text: str,
+        player_cards: list[Card],
+        dealer_text: str,
+        dealer_cards: list[Card],
+        hidden_indexes: set[int],
+        deck_count: int,
+    ) -> None:
         self.player_var.set(player_text)
         self.dealer_var.set(dealer_text)
+        self._render_card_row(self.player_cards_frame, player_cards)
+        self._render_card_row(self.dealer_cards_frame, dealer_cards, hidden_indexes=hidden_indexes)
         self.deck_var.set(f"Deck: {deck_count} cards")
 
     def _finish_initial_deal(self) -> None:

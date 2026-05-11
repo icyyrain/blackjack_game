@@ -41,7 +41,7 @@ conda run -n blackjack-game python -m blackjack.gui
 powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1
 ```
 
-The executable is written to `dist\Blackjack.exe`.
+The build script converts the SVG card artwork in `assets\poker-super2-box-qr` to PNG files in `assets\cards`, then writes the executable to `dist\Blackjack.exe`.
 
 The build script automatically finds `conda.exe` from your PATH or common Miniconda/Anaconda install locations. You can still pass a specific path if needed:
 

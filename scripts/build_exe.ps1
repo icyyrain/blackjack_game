@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 $ExePath = Join-Path $ProjectRoot "dist\Blackjack.exe"
+$CardAssetsPath = Join-Path $ProjectRoot "assets\cards"
 
 function Resolve-CondaExe {
     param(
@@ -52,6 +53,11 @@ if ($RunningExe) {
     throw "Close dist\Blackjack.exe before building. It is currently running and Windows will not let PyInstaller replace it."
 }
 
+& $CondaExe run -n $EnvName python scripts\prepare_card_images.py
+if ($LASTEXITCODE -ne 0) {
+    throw "Card image preparation failed with exit code $LASTEXITCODE."
+}
+
 & $CondaExe run -n $EnvName python -m PyInstaller `
     --noconfirm `
     --clean `
@@ -59,6 +65,7 @@ if ($RunningExe) {
     --windowed `
     --name Blackjack `
     --specpath build `
+    --add-data "$CardAssetsPath;assets\cards" `
     --paths src `
     src\blackjack\gui.py
 

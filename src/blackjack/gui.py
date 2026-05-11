@@ -43,6 +43,7 @@ class BlackjackApp(tk.Tk):
         tk.Label(info, textvariable=self.deck_var, font=("Segoe UI", 12), fg="white", bg="#14532d").pack(side="left", padx=24)
         tk.Label(info, text="Bet:", font=("Segoe UI", 12), fg="white", bg="#14532d").pack(side="right")
         tk.Entry(info, textvariable=self.bet_var, width=8).pack(side="right", padx=8)
+        tk.Button(info, text="Rules", width=8, command=self.show_rules).pack(side="right", padx=8)
 
         self.dealer_label = tk.Label(
             self,
@@ -100,6 +101,36 @@ class BlackjackApp(tk.Tk):
 
     def split(self) -> None:
         self._delay_action("Splitting hand...", self.game.split)
+
+    def show_rules(self) -> None:
+        messagebox.showinfo(
+            "Blackjack Rules",
+            "\n".join(
+                [
+                    "Goal: beat the dealer without going over 21.",
+                    "",
+                    "Actions:",
+                    "- Hit: take one card.",
+                    "- Stand: end your hand.",
+                    "- Double: double your bet, take one card, then stand.",
+                    "- Split: available only on an initial pair. Creates two hands.",
+                    "",
+                    "Dealer:",
+                    "- Dealer reveals the hidden card after you stand.",
+                    "- Dealer draws until reaching 17 or higher.",
+                    "",
+                    "Payouts:",
+                    "- Blackjack pays 2:1.",
+                    "- Normal win pays 1:1.",
+                    "- Push returns your bet.",
+                    "",
+                    "Split notes:",
+                    "- Split is allowed once.",
+                    "- Double is not available after split.",
+                    "- A split-hand 21 is not a natural Blackjack.",
+                ]
+            ),
+        )
 
     def _refresh(self) -> None:
         self.chips_var.set(f"Chips: {self.game.chips:g}")

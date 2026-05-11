@@ -112,7 +112,7 @@ def test_double_down_is_unavailable_after_hit():
     assert Action.DOUBLE not in game.legal_actions()
 
 
-def test_player_blackjack_pays_three_to_two():
+def test_player_blackjack_pays_two_to_one():
     game = BlackjackGame(starting_chips=100, deck_factory=lambda: [
         Card("9", "clubs"),
         Card("A", "diamonds"),
@@ -124,7 +124,7 @@ def test_player_blackjack_pays_three_to_two():
 
     assert game.phase == Phase.SETTLED
     assert game.result.outcome == "player_blackjack"
-    assert game.chips == 115
+    assert game.chips == 120
 
 
 def test_push_leaves_chips_unchanged():

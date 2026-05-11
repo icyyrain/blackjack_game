@@ -28,7 +28,13 @@ class BlackjackApp(tk.Tk):
         self._refresh()
 
     def _build(self) -> None:
-        title = tk.Label(self, text="Blackjack", font=("Segoe UI", 24, "bold"), fg="white", bg="#14532d")
+        title = tk.Label(
+            self,
+            text="Blackjack",
+            font=("Georgia", 30, "bold italic"),
+            fg="#f8fafc",
+            bg="#14532d",
+        )
         title.pack(pady=12)
 
         info = tk.Frame(self, bg="#14532d")
@@ -38,12 +44,26 @@ class BlackjackApp(tk.Tk):
         tk.Label(info, text="Bet:", font=("Segoe UI", 12), fg="white", bg="#14532d").pack(side="right")
         tk.Entry(info, textvariable=self.bet_var, width=8).pack(side="right", padx=8)
 
-        self.dealer_label = tk.Label(self, textvariable=self.dealer_var, font=("Consolas", 16), fg="white", bg="#166534")
+        self.dealer_label = tk.Label(
+            self,
+            textvariable=self.dealer_var,
+            font=("Consolas", 16),
+            fg="white",
+            bg="#166534",
+            justify="center",
+        )
         self.dealer_label.pack(fill="x", padx=24, pady=16, ipady=18)
 
         tk.Label(self, textvariable=self.status_var, font=("Segoe UI", 13), fg="white", bg="#14532d").pack(pady=6)
 
-        self.player_label = tk.Label(self, textvariable=self.player_var, font=("Consolas", 16), fg="white", bg="#166534")
+        self.player_label = tk.Label(
+            self,
+            textvariable=self.player_var,
+            font=("Consolas", 16),
+            fg="white",
+            bg="#166534",
+            justify="center",
+        )
         self.player_label.pack(fill="x", padx=24, pady=16, ipady=18)
 
         buttons = tk.Frame(self, bg="#14532d")
@@ -81,13 +101,10 @@ class BlackjackApp(tk.Tk):
     def split(self) -> None:
         self._delay_action("Splitting hand...", self.game.split)
 
-    def _cards(self, cards) -> str:
-        return " ".join(card.display() for card in cards) or "(none)"
-
     def _refresh(self) -> None:
         self.chips_var.set(f"Chips: {self.game.chips:g}")
-        self.deck_var.set(f"牌堆: {len(self.game.deck)} 张")
-        self.dealer_var.set(f"Dealer: {self.game.dealer_display()}")
+        self.deck_var.set(f"Deck: {len(self.game.deck)} cards")
+        self.dealer_var.set(self._dealer_text())
         self.player_var.set(self._player_text())
         self.log_var.set("\n".join(self.game.log[-4:]))
 
@@ -100,14 +117,22 @@ class BlackjackApp(tk.Tk):
 
         self._set_button_states()
 
+    def _dealer_text(self) -> str:
+        if not self.game.dealer_hand.cards:
+            return "Dealer:\n(none)"
+        if self.game.phase == Phase.PLAYER_TURN:
+            visible_value = self.game.dealer_hand.cards[0].value
+            return f"Dealer: ({visible_value}+?)\n{self.game.dealer_display()}"
+        return f"Dealer: ({self.game.dealer_hand.value})\n{self.game.dealer_display()}"
+
     def _player_text(self) -> str:
         if not self.game.split_active:
             cards = self.game.player_hand.display() or "(none)"
-            return f"Player: {cards} ({self.game.player_hand.value})"
+            return f"Player: ({self.game.player_hand.value})\n{cards}"
         lines = []
         for index, hand in enumerate(self.game.player_hands):
             marker = ">" if index == self.game.current_hand_index and self.game.phase == Phase.PLAYER_TURN else " "
-            lines.append(f"{marker} Hand {index + 1}: {hand.display()} ({hand.value})")
+            lines.append(f"{marker} Hand {index + 1}: ({hand.value})\n  {hand.display()}")
         return "\n".join(lines)
 
     def _set_button_states(self, disabled: bool = False) -> None:
@@ -131,20 +156,20 @@ class BlackjackApp(tk.Tk):
     def _animate_initial_deal(self) -> None:
         self.dealing = True
         self._set_button_states(disabled=True)
-        self.dealer_var.set("Dealer: (none)")
-        self.player_var.set("Player: (none)")
+        self.dealer_var.set("Dealer:\n(none)")
+        self.player_var.set("Player:\n(none)")
         self.status_var.set("Dealing...")
         first = self.game.player_hands[0]
         sequence = [
-            (f"Player: {first.cards[0].display()}", "Dealer: (none)"),
-            (f"Player: {first.cards[0].display()}", f"Dealer: {self.game.dealer_hand.cards[0].display()}"),
+            (f"Player:\n{first.cards[0].display()}", "Dealer:\n(none)"),
+            (f"Player:\n{first.cards[0].display()}", f"Dealer:\n{self.game.dealer_hand.cards[0].display()}"),
             (
-                f"Player: {first.cards[0].display()} {first.cards[1].display()}",
-                f"Dealer: {self.game.dealer_hand.cards[0].display()}",
+                f"Player:\n{first.cards[0].display()} {first.cards[1].display()}",
+                f"Dealer:\n{self.game.dealer_hand.cards[0].display()}",
             ),
             (
-                f"Player: {first.display()} ({first.value})",
-                f"Dealer: {self.game.dealer_hand.cards[0].display()} [?]",
+                f"Player: ({first.value})\n{first.display()}",
+                f"Dealer: ({self.game.dealer_hand.cards[0].value}+?)\n{self.game.dealer_hand.cards[0].display()} [?]",
             ),
         ]
         for index, (player_text, dealer_text) in enumerate(sequence, start=1):
@@ -154,7 +179,7 @@ class BlackjackApp(tk.Tk):
     def _show_deal_step(self, player_text: str, dealer_text: str) -> None:
         self.player_var.set(player_text)
         self.dealer_var.set(dealer_text)
-        self.deck_var.set(f"牌堆: {len(self.game.deck)} 张")
+        self.deck_var.set(f"Deck: {len(self.game.deck)} cards")
 
     def _finish_initial_deal(self) -> None:
         self.dealing = False

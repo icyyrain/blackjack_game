@@ -124,6 +124,7 @@ def test_player_blackjack_pays_two_to_one():
 
     assert game.phase == Phase.SETTLED
     assert game.result.outcome == "player_blackjack"
+    assert game.result.message == "Congratulations! You have Blackjack."
     assert game.chips == 120
 
 

@@ -240,7 +240,7 @@ class BlackjackGame:
         if natural_blackjack and self.dealer_hand.is_blackjack:
             return RoundResult("push", 0, "Both sides have Blackjack. Push.", hand_index)
         if natural_blackjack:
-            return RoundResult("player_blackjack", bet * 2, "Blackjack pays 2:1.", hand_index)
+            return RoundResult("player_blackjack", bet * 2, "Congratulations! You have Blackjack.", hand_index)
         if self.dealer_hand.is_blackjack:
             return RoundResult("dealer_blackjack", -bet, "Dealer has Blackjack.", hand_index)
         if hand.is_bust:

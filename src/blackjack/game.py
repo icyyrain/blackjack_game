@@ -19,6 +19,7 @@ class Action(str, Enum):
     HIT = "hit"
     STAND = "stand"
     DOUBLE = "double"
+    SPLIT = "split"
 
 
 @dataclass
@@ -26,6 +27,7 @@ class RoundResult:
     outcome: str
     chip_delta: float
     message: str
+    hand_index: int | None = None
 
 
 DeckFactory = Callable[[], list[Card] | Deck]
@@ -39,6 +41,11 @@ class BlackjackGame:
     bet: float = field(default=0, init=False)
     deck: Deck = field(init=False)
     player_hand: Hand = field(default_factory=Hand, init=False)
+    player_hands: list[Hand] = field(default_factory=list, init=False)
+    hand_bets: list[float] = field(default_factory=list, init=False)
+    hand_results: list[RoundResult] = field(default_factory=list, init=False)
+    current_hand_index: int = field(default=0, init=False)
+    split_active: bool = field(default=False, init=False)
     dealer_hand: Hand = field(default_factory=Hand, init=False)
     phase: Phase = field(default=Phase.BETTING, init=False)
     result: RoundResult | None = field(default=None, init=False)
@@ -67,6 +74,11 @@ class BlackjackGame:
         self.bet = bet
         self.deck = self._new_deck()
         self.player_hand = Hand()
+        self.player_hands = [self.player_hand]
+        self.hand_bets = [bet]
+        self.hand_results = []
+        self.current_hand_index = 0
+        self.split_active = False
         self.dealer_hand = Hand()
         self.result = None
         self.log = ["New round started."]
@@ -86,12 +98,27 @@ class BlackjackGame:
             return self.dealer_hand.cards[:1]
         return list(self.dealer_hand.cards)
 
+    def dealer_display(self) -> str:
+        if not self.dealer_hand.cards:
+            return "(none)"
+        if self.phase == Phase.PLAYER_TURN:
+            return f"{self.dealer_hand.cards[0].display()} [?]"
+        return self.dealer_hand.display()
+
     def legal_actions(self) -> set[Action]:
         if self.phase != Phase.PLAYER_TURN:
             return set()
         actions = {Action.HIT, Action.STAND}
-        if len(self.player_hand.cards) == 2 and not self.player_has_acted and self.chips >= self.bet * 2:
+        if (
+            not self.split_active
+            and len(self.player_hand.cards) == 2
+            and not self.player_has_acted
+            and self.chips >= self.bet * 2
+        ):
             actions.add(Action.DOUBLE)
+            first, second = self.player_hand.cards
+            if first.rank == second.rank:
+                actions.add(Action.SPLIT)
         return actions
 
     def hit(self) -> RoundResult | None:
@@ -100,25 +127,48 @@ class BlackjackGame:
         self.player_hand.add(self.deck.deal())
         self.log.append("Player hits.")
         if self.player_hand.is_bust:
-            return self.settle_round()
+            self.log.append(f"Hand {self.current_hand_index + 1} busts.")
+            if not self.split_active:
+                return self.settle_round()
+            if self._advance_split_hand():
+                return None
+            return self.finish_player_turn()
         return None
 
     def stand(self) -> RoundResult:
         self._require_action(Action.STAND)
         self.player_has_acted = True
-        self.phase = Phase.DEALER_TURN
-        self.log.append("Player stands.")
-        self.dealer_play()
-        return self.settle_round()
+        self.log.append(f"Hand {self.current_hand_index + 1} stands.")
+        if self._advance_split_hand():
+            return RoundResult("next_hand", 0, "Next split hand.", self.current_hand_index)
+        return self.finish_player_turn()
 
     def double_down(self) -> RoundResult:
         self._require_action(Action.DOUBLE)
         self.bet *= 2
+        self.hand_bets[self.current_hand_index] = self.bet
         self.player_has_acted = True
         self.player_hand.add(self.deck.deal())
         self.log.append("Player doubles down.")
         if self.player_hand.is_bust:
             return self.settle_round()
+        return self.finish_player_turn()
+
+    def split(self) -> None:
+        self._require_action(Action.SPLIT)
+        first, second = self.player_hand.cards
+        self.split_active = True
+        self.player_hands = [Hand([first]), Hand([second])]
+        self.hand_bets = [self.bet, self.bet]
+        self.hand_results = []
+        self.current_hand_index = 0
+        self.player_hand = self.player_hands[0]
+        self.player_has_acted = False
+        self.player_hands[0].add(self.deck.deal())
+        self.player_hands[1].add(self.deck.deal())
+        self.log.append("Player splits.")
+
+    def finish_player_turn(self) -> RoundResult:
         self.phase = Phase.DEALER_TURN
         self.dealer_play()
         return self.settle_round()
@@ -130,28 +180,48 @@ class BlackjackGame:
             self.log.append("Dealer draws.")
 
     def settle_round(self) -> RoundResult:
-        if self.player_hand.is_blackjack and self.dealer_hand.is_blackjack:
-            result = RoundResult("push", 0, "Both sides have Blackjack. Push.")
-        elif self.player_hand.is_blackjack:
-            result = RoundResult("player_blackjack", self.bet * 1.5, "Blackjack pays 3:2.")
-        elif self.dealer_hand.is_blackjack:
-            result = RoundResult("dealer_blackjack", -self.bet, "Dealer has Blackjack.")
-        elif self.player_hand.is_bust:
-            result = RoundResult("player_bust", -self.bet, "Player busts.")
-        elif self.dealer_hand.is_bust:
-            result = RoundResult("dealer_bust", self.bet, "Dealer busts.")
-        elif self.player_hand.value > self.dealer_hand.value:
-            result = RoundResult("player_win", self.bet, "Player wins.")
-        elif self.player_hand.value < self.dealer_hand.value:
-            result = RoundResult("dealer_win", -self.bet, "Dealer wins.")
+        self.hand_results = [
+            self._settle_hand(hand, bet, index) for index, (hand, bet) in enumerate(zip(self.player_hands, self.hand_bets))
+        ]
+        chip_delta = sum(result.chip_delta for result in self.hand_results)
+        if len(self.hand_results) == 1:
+            result = self.hand_results[0]
         else:
-            result = RoundResult("push", 0, "Push.")
+            summary = ", ".join(f"Hand {item.hand_index + 1}: {item.message}" for item in self.hand_results)
+            result = RoundResult("split_settled", chip_delta, summary)
 
-        self.chips += result.chip_delta
+        self.chips += chip_delta
         self.phase = Phase.SETTLED
         self.result = result
         self.log.append(result.message)
         return result
+
+    def _settle_hand(self, hand: Hand, bet: float, hand_index: int) -> RoundResult:
+        natural_blackjack = not self.split_active and hand.is_blackjack
+        if natural_blackjack and self.dealer_hand.is_blackjack:
+            return RoundResult("push", 0, "Both sides have Blackjack. Push.", hand_index)
+        if natural_blackjack:
+            return RoundResult("player_blackjack", bet * 1.5, "Blackjack pays 3:2.", hand_index)
+        if self.dealer_hand.is_blackjack:
+            return RoundResult("dealer_blackjack", -bet, "Dealer has Blackjack.", hand_index)
+        if hand.is_bust:
+            return RoundResult("player_bust", -bet, "Player busts.", hand_index)
+        if self.dealer_hand.is_bust:
+            return RoundResult("dealer_bust", bet, "Dealer busts.", hand_index)
+        if hand.value > self.dealer_hand.value:
+            return RoundResult("player_win", bet, "Player wins.", hand_index)
+        if hand.value < self.dealer_hand.value:
+            return RoundResult("dealer_win", -bet, "Dealer wins.", hand_index)
+        return RoundResult("push", 0, "Push.", hand_index)
+
+    def _advance_split_hand(self) -> bool:
+        if not self.split_active or self.current_hand_index >= len(self.player_hands) - 1:
+            return False
+        self.current_hand_index += 1
+        self.player_hand = self.player_hands[self.current_hand_index]
+        self.player_has_acted = False
+        self.log.append(f"Playing hand {self.current_hand_index + 1}.")
+        return True
 
     def _require_action(self, action: Action) -> None:
         if action not in self.legal_actions():

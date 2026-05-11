@@ -6,6 +6,12 @@ import random
 
 RANKS = ("A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
 SUITS = ("clubs", "diamonds", "hearts", "spades")
+SUIT_SYMBOLS = {
+    "clubs": "♣",
+    "diamonds": "♦",
+    "hearts": "♥",
+    "spades": "♠",
+}
 
 
 @dataclass(frozen=True)
@@ -22,7 +28,7 @@ class Card:
         return int(self.rank)
 
     def display(self) -> str:
-        return f"[{self.rank} {self.suit}]"
+        return f"[{self.rank}{SUIT_SYMBOLS[self.suit]}]"
 
 
 class Deck:

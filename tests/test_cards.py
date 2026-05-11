@@ -27,3 +27,10 @@ def test_deal_pops_from_top_of_deck():
 
     assert dealt == top
     assert deck.cards == [bottom]
+
+
+def test_card_display_uses_suit_symbols():
+    assert Card("A", "spades").display() == "[A♠]"
+    assert Card("10", "hearts").display() == "[10♥]"
+    assert Card("Q", "diamonds").display() == "[Q♦]"
+    assert Card("2", "clubs").display() == "[2♣]"

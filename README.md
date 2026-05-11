@@ -2,7 +2,7 @@
 
 A single-player Blackjack game where you play against a dealer. The project includes both a terminal interface and a Windows GUI build.
 
-![Blackjack GUI screenshot](assets/game.jpg)
+![Blackjack GUI screenshot](assets/game.png)
 
 ## Features
 

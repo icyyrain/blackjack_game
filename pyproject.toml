@@ -1,0 +1,9 @@
+[project]
+name = "blackjack-game"
+version = "0.1.0"
+description = "A single-player Blackjack game with terminal and tkinter interfaces."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

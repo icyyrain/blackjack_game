@@ -1,0 +1,6 @@
+name: blackjack-game
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.11
+  - pytest>=8
